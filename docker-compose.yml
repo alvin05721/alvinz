@@ -1,0 +1,114 @@
+#!/bin/bash
+
+mengatur -e
+
+##################################################### ######################################
+# #
+# Proyek 'pterodactyl-installer' #
+# #
+# Hak Cipta (C) 2018 - 2024, Vilhelm Prytz, <vilhelm@prytznet.se> #
+# #
+# Program ini adalah perangkat lunak bebas: Anda dapat mendistribusikannya kembali dan/atau memodifikasinya #
+# itu di bawah ketentuan Lisensi Publik Umum GNU sebagaimana diterbitkan oleh #
+# Yayasan Perangkat Lunak Bebas, baik versi 3 dari Lisensi, atau #
+# (sesuai pilihan Anda) versi mana pun yang terbaru. #
+# #
+# Program ini didistribusikan dengan harapan dapat bermanfaat, #
+# tetapi TANPA GARANSI APAPUN; bahkan tanpa jaminan tersirat dari #
+# KEMAMPUAN DIPERDAGANGKAN atau KESESUAIAN UNTUK TUJUAN TERTENTU. Lihat #
+# Lisensi Publik Umum GNU untuk rincian lebih lanjut. #
+# #
+# Anda seharusnya telah menerima salinan Lisensi Publik Umum GNU #
+# bersama dengan program ini. Jika tidak, lihat <https://www.gnu.org/licenses/>. #
+# #
+# https://github.com/pterodactyl-installer/pterodactyl-installer/blob/master/LICENSE #
+# #
+# Skrip ini tidak terkait dengan Proyek Pterodactyl resmi. #
+# https://github.com/pterodactyl-installer/pterodactyl-installer #
+# #
+##################################################### ######################################
+
+ekspor GITHUB_SOURCE="v1.1.0"
+ekspor SCRIPT_RELEASE="v1.1.0"
+ekspor GITHUB_BASE_URL="https://raw.githubusercontent.com/pterodactyl-installer/pterodactyl-installer"
+
+LOG_PATH="/var/log/pemasang-pterodactyl.log"
+
+# periksa ikal
+jika ! [ -x "$(perintah -v curl)" ]; maka
+  echo "* curl diperlukan agar skrip ini dapat berfungsi."
+  echo "* instal menggunakan apt (Debian dan turunannya) atau yum/dnf (CentOS)"
+  keluar 1
+baiklah
+
+# Selalu hapus lib.sh, sebelum mengunduhnya
+[ -f /tmp/lib.sh ] dan rm -rf /tmp/lib.sh
+ikal -sSL -o /tmp/lib.sh "$GITHUB_BASE_URL"/master/lib/lib.sh
+# shellcheck sumber=lib/lib.sh
+sumber /tmp/lib.sh
+
+mengeksekusi() {
+  echo -e "\n\n* pterodactyl-installer $(tanggal) \n\n" >>$LOG_PATH
+
+  [[ "$1" == *"canary"* ]] && ekspor GITHUB_SOURCE="master" && ekspor SCRIPT_RELEASE="canary"
+  perbarui_lib_source
+  jalankan_ui "${1//_canary}" |& tee -a $LOG_PATH
+
+  jika [[ -n $2 ]]; maka
+    echo -e -n "* Instalasi $1 telah selesai. Apakah Anda ingin melanjutkan ke instalasi $2? (y/T): "
+    baca -r KONFIRMASI
+    jika [[ "$CONFIRM" =~ [Yy] ]]; maka
+      jalankan "$2"
+    kalau tidak
+      kesalahan "Instalasi $2 dibatalkan."
+      keluar 1
+    baiklah
+  baiklah
+}
+
+selamat datang ""
+
+selesai=salah
+sementara [ "$done" == false ]; lakukan
+  pilihan=(
+    "Pasang panel"
+    "Pasang Sayap"
+    "Instal [0] dan [1] pada mesin yang sama (skrip wings berjalan setelah panel)"
+    # "Copot panel atau sayap\n"
+
+    "Instal panel dengan versi canary dari skrip (versi yang ada di master, mungkin rusak!)"
+    "Instal Wings dengan versi skrip canary (versi yang ada di master, mungkin rusak!)"
+    "Instal [3] dan [4] pada mesin yang sama (skrip wings berjalan setelah panel)"
+    "Copot panel atau sayap dengan versi skrip canary (versi yang ada di master, mungkin rusak!)"
+  )
+
+  tindakan=(
+    "panel"
+    "sayap"
+    "panel;sayap"
+    # "hapus instalasi"
+
+    "panel_kenari"
+    "sayap_kenari"
+    "panel_kenari;sayap_kenari"
+    "hapus_canary"
+  )
+
+  keluaran "Apa yang ingin Anda lakukan?"
+
+  untuk saya di "${!options[@]}"; lakukan
+    keluaran "[$i] ${options[$i]}"
+  Selesai
+
+  echo -n "* Masukan 0-$((${#tindakan[@]} - 1)): "
+  baca tindakan -r
+
+  [ -z "$action" ] && error "Input diperlukan" && lanjutkan
+
+  valid_input=("$(untuk ((i = 0; i <= ${#actions[@]} - 1; i += 1)); lakukan echo "${i}"; selesai)")
+  [[ ! " ${valid_input[*]} " =~ ${action} ]] && error "Pilihan tidak valid"
+  [[ " ${valid_input[*]} " =~ ${action} ]] && selesai=benar && IFS=";" baca -r i1 i2 <<<"${actions[$action]}" && jalankan "$i1" "$i2"
+Selesai
+
+# Hapus lib.sh, jadi saat skrip dijalankan berikutnya, versi terbaru akan diunduh.
+rm -rf /tmp/lib.sh
